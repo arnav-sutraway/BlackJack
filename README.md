@@ -47,3 +47,8 @@ cards in real time and recommend the optimal move.
 - [@TarunIsCOde](https://github.com/TarunIsCOde)
 - [@rajprian123-bit](https://github.com/rajprian123-bit)
 - [@Shayan-kam](https://github.com/Shayan-kam)
+
+## Results
+![Model Graphs](assets/results.png)
+![Model Training](assets/train_batch0.jpg)
+![More Training](assets/val_batch0_labels.jpg)
