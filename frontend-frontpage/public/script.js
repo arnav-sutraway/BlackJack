@@ -43,7 +43,6 @@ const addChatMessage = (htmlMarkup, isSystem = false) => {
 
 // API Bridge
 const getAIAdvice = async () => {
-    // Completely clear the chat to only show the CURRENT active suggestion
     chatContentBox.innerHTML = '';
     addChatMessage("Analyzing cards with Gemini 1.5...", true);
     
@@ -61,20 +60,22 @@ const getAIAdvice = async () => {
         
         const result = await response.json();
         
-        // Remove loading state
         const msgs = chatContentBox.querySelectorAll('.chat-message');
         if (msgs.length > 0) msgs[msgs.length - 1].remove();
 
         if (result.success) {
             addChatMessage(result.advice);
+            if (result.advice.toUpperCase().includes("BUST") || result.advice.includes("21")) {
+                const audio = new Audio('/fuhh.mp3');
+                audio.play().catch(e => {});
+            }
         } else {
             addChatMessage(`Error: ${result.error}`);
         }
     } catch (e) {
-        // Remove loading state
         const msgs = chatContentBox.querySelectorAll('.chat-message');
         if (msgs.length > 0) msgs[msgs.length - 1].remove();
-        addChatMessage("Could not connect to Python Server. Please open your terminal and run <strong>python server.py</strong>!", true);
+        addChatMessage("Could not connect to Python Server. Run <strong>python server.py</strong>!", true);
     }
 };
 
