@@ -117,8 +117,30 @@ body, html {
 .action-buttons {
     display: flex;
     flex-direction: row;
+    align-items: center;
     gap: 1vw;
     justify-content: center;
+}
+
+.camera-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5vw;
+    padding: 0.6vw 1vw;
+    border-radius: 8px;
+    font-size: 1vw;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.camera-toggle input {
+    width: 1.1vw;
+    height: 1.1vw;
+    accent-color: #8b5cf6;
+    cursor: pointer;
 }
 
 .action-btn {
@@ -324,6 +346,25 @@ body, html {
 
 .card.red-suit {
     color: #e11d48;
+}
+
+.card.face-down {
+    background: linear-gradient(145deg, #1e3a5f 0%, #0f172a 50%, #1e3a8a 100%);
+    color: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.card.face-down .card-back {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.06),
+        rgba(255, 255, 255, 0.06) 4px,
+        transparent 4px,
+        transparent 8px
+    );
 }
 
 .card .top-left { text-align: left; line-height: 1; }

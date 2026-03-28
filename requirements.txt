@@ -1,3 +1,10 @@
 # Gemini client: needs Python 3.9+ (3.8 cannot install current releases).
 google-generativeai>=0.8.0
 python-dotenv>=1.0.0
+
+# camera.py / CardDetector — install with the SAME Python you use for server.py, e.g.:
+#   python3.11 -m pip install -r requirements.txt
+# You need trained weights: copy best.pt next to camera.py or set YOLO_MODEL_PATH=/path/to/best.pt
+opencv-python>=4.8.0
+numpy>=1.24.0
+ultralytics>=8.0.0
