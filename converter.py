@@ -1,7 +1,7 @@
 '''
 DO NOT RUN AGAIN
 '''
-
+'''
 import os
 
 labels_dir = "dataset/YOLO_Annotations"
@@ -49,3 +49,4 @@ for i, file in enumerate(files):
         f.write("\n".join(new_lines))
 
 print("Done!")
+'''

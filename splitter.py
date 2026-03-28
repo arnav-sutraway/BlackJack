@@ -1,3 +1,4 @@
+'''
 import os
 
 for folder in ["train", "val"]:
@@ -11,3 +12,4 @@ for folder in ["train", "val"]:
             with open(lbl_file) as f:
                 if len(f.readlines()) == 0:
                     print("Empty label:", img_file)
+'''
