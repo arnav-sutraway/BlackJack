@@ -4,47 +4,16 @@ import threading
 import time
 from ultralytics import YOLO
 
+# --- CONFIGURATION ---
+MODEL_PATH = "runs/detect/train4/weights/best.pt"
+# Make sure this matches the IP currently shown on your phone's screen
+URL = "http://10.250.53.220:8080/video" 
 
-DEFAULT_STREAM_URL = "http://10.250.34.10:4747/video"
-
-def start_camera():
-    cap = cv2.VideoCapture(DEFAULT_STREAM_URL)
-
-    if not cap.isOpened():
-        return
-
-    while True:
-        ret, frame = cap.read()
-        
-        if not ret:
-            break
-
-        cv2.imshow('Antigravity - Python 3.14 Feed', frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    start_camera()
-
-if __name__ == "__main__":
-    start_camera()
-
-
-def _open_capture(source):
-    """Open VideoCapture from integer index (e.g. 0) or URL string (IP Webcam, file, etc.)."""
-    if isinstance(source, str) and source.isdigit():
-        return cv2.VideoCapture(int(source))
-    return cv2.VideoCapture(source)
-
-
+# --- THREADED READER ---
 class StreamReader:
     def __init__(self, url):
         self.url = url
-        self.cap = _open_capture(url)
+        self.cap = cv2.VideoCapture(url)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.frame = None
         self.ret = False
@@ -62,7 +31,7 @@ class StreamReader:
                     self.ret = ret
                     self.frame = frame
             else:
-                time.sleep(0.05)
+                time.sleep(0.01)
 
     def read(self):
         with self.lock:
@@ -75,147 +44,94 @@ class StreamReader:
 
     def release(self):
         self.running = False
-        self.thread.join(timeout=2)
         self.cap.release()
 
+# --- INITIALIZATION ---
+model = YOLO(MODEL_PATH)
+stream = StreamReader(URL)
 
+if not stream.isOpened():
+    print("CRITICAL: Cannot connect to phone. Check IP and Wi-Fi.")
+    exit()
 
-# ---------------------------------------------------------------------------
-# New reusable detection API for frontend + server integration
-# ---------------------------------------------------------------------------
-class CardDetector:
-    def __init__(self, url=None, commit_streak=4):
-        self.url = url if url is not None else DEFAULT_STREAM_URL
-        self.stream = StreamReader(self.url)
-        self.model = YOLO(MODEL_PATH)
+count = 0
+seen_cards = set()  # Confirmed track IDs
+pending = {}       # track_id -> {'rank': str, 'streak': int}
+COMMIT_STREAK = 3  # Frames needed to "confirm" a card
+count_map = {
+    '2': 1, '3': 1, '4': 1, '5': 1, '6': 1,
+    '7': 0, '8': 0, '9': 0,
+    '10': -1, 'J': -1, 'Q': -1, 'K': -1, 'A': -1
+}
 
-        self.count_map = {
-            '2': 1, '3': 1, '4': 1, '5': 1, '6': 1,
-            '7': 0, '8': 0, '9': 0,
-            '10': -1, 'J': -1, 'Q': -1, 'K': -1, 'A': -1
-        }
+print("Detection started. Press 'q' to quit, 'r' to reset count.")
 
-        self.count = 0
-        self.seen_cards = set()
-        self.pending = {}
-        self.commit_streak = commit_streak
-        self.failed_frames = 0
-        self.max_failed_frames = 100
-        self.last_committed = []
+while True:
+    ret, frame = stream.read()
+    if not ret or frame is None:
+        continue
 
-        self.jpeg_bytes = None
-        self.state_lock = threading.Lock()
-        self.running = True
-        self.worker = threading.Thread(target=self._detect_loop, daemon=True)
-        self.worker.start()
+    # 1. RUN TRACKING (persist=True is required for box.id)
+    results = model.track(frame, conf=0.35, persist=True, verbose=False)
+    active_ids = set()
 
-    def _detect_loop(self):
-        while self.running:
-            ret, frame = self.stream.read()
-            if not ret or frame is None:
-                self.failed_frames += 1
-                if self.failed_frames >= self.max_failed_frames:
-                    self.stream.release()
-                    self.stream = StreamReader(self.url)
-                    self.failed_frames = 0
-                    continue
-                time.sleep(0.05)
+    if results and results[0].boxes.id is not None:
+        boxes = results[0].boxes
+        for box in boxes:
+            track_id = int(box.id[0])
+            cls_id = int(box.cls[0])
+            rank = model.names[cls_id]
+            active_ids.add(track_id)
+            
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            # Logic: If already counted, draw ORANGE
+            if track_id in seen_cards:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
+                cv2.putText(frame, f"{rank} (OK)", (x1, y1-10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 165, 0), 2)
                 continue
 
-            self.failed_frames = 0
-            results = self.model.track(frame, conf=0.30, persist=True, verbose=False)
-            active_ids = set()
+            # Logic: New card detected, check streak
+            if track_id not in pending or pending[track_id]['rank'] != rank:
+                pending[track_id] = {'rank': rank, 'streak': 1}
+            else:
+                pending[track_id]['streak'] += 1
 
-            for r in results:
-                boxes = r.boxes
-                if boxes is None:
-                    continue
+            streak = pending[track_id]['streak']
+            
+            if streak >= COMMIT_STREAK:
+                # COMMIT the card
+                seen_cards.add(track_id)
+                if rank in count_map:
+                    count += count_map[rank]
+                pending.pop(track_id, None)
+            else:
+                # Still checking (Yellow)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
+                cv2.putText(frame, f"Checking {rank}... {streak}/{COMMIT_STREAK}", 
+                            (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
-                for box in boxes:
-                    cls_id = int(box.cls[0])
-                    rank = self.model.names[cls_id]
-                    confidence = float(box.conf[0])
-                    track_id = int(box.id[0]) if box.id is not None else None
+    # 2. CLEANUP: Remove IDs that are no longer in the camera frame
+    pending = {tid: val for tid, val in pending.items() if tid in active_ids}
 
-                    if track_id is None or confidence < 0.30:
-                        continue
+    # 3. OVERLAYS
+    cv2.putText(frame, f"Count: {count}", (20, 50), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+    cv2.putText(frame, f"Cards: {len(seen_cards)}", (20, 90), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-                    active_ids.add(track_id)
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+    cv2.imshow("Blackjack Counter", frame)
 
-                    if track_id in self.seen_cards:
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
-                        cv2.putText(frame, f"{rank} (counted)", (x1, y1 - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                        continue
+    # 4. KEYBOARD CONTROLS
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
+        break
+    elif key == ord('r'):
+        count = 0
+        seen_cards.clear()
+        pending.clear()
+        print("Count Reset.")
 
-                    if track_id not in self.pending or self.pending[track_id]['rank'] != rank:
-                        self.pending[track_id] = {'rank': rank, 'streak': 1}
-                    else:
-                        self.pending[track_id]['streak'] += 1
-
-                    streak = self.pending[track_id]['streak']
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
-                    cv2.putText(frame, f"{rank} ({streak}/{self.commit_streak})", (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-
-                    if streak >= self.commit_streak:
-                        self.seen_cards.add(track_id)
-                        self.last_committed.append(rank)
-                        if rank in self.count_map:
-                            self.count += self.count_map[rank]
-                        self.pending.pop(track_id, None)
-
-            for tid in list(self.pending.keys()):
-                if tid not in active_ids:
-                    self.pending.pop(tid, None)
-
-            cv2.putText(frame, f"Count: {self.count}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
-            cv2.putText(frame, f"Cards seen: {len(self.seen_cards)}/52", (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
-
-            _, jpeg = cv2.imencode('.jpg', frame)
-            with self.state_lock:
-                self.jpeg_bytes = jpeg.tobytes()
-
-        self.stream.release()
-
-    def get_frame(self):
-        with self.state_lock:
-            return self.jpeg_bytes
-
-    def get_state(self):
-        with self.state_lock:
-            return {
-                'count': self.count,
-                'cards_seen': len(self.seen_cards),
-                'seen_cards': sorted(list(self.seen_cards)),
-                'last_committed': self.last_committed[-10:]
-            }
-
-    def reset(self):
-        with self.state_lock:
-            self.count = 0
-            self.seen_cards.clear()
-            self.pending.clear()
-            self.last_committed.clear()
-
-    def stop(self):
-        self.running = False
-        self.worker.join(timeout=2)
-
-
-# ---------------------------------------------------------------------------
-# Original legacy sample usage (kept as commented fallback)
-# ---------------------------------------------------------------------------
-if __name__ == '__main__':
-    # Legacy direct run with OpenCV GUI (kept for reference and manual testing)
-    # Uncomment if you want to run without server integration:
-    #
-    # stream = StreamReader(url)
-    # if not stream.isOpened():
-    #     print("Failed to connect to stream. Check IP and that IP Webcam is running.")
-    #     exit()
-    # print("Stream connected. Starting detection...")
-    # print("Model class names:", model.names)
-    # (existing while True loop implementation can be copied here if needed)
-    pass
+stream.release()
+cv2.destroyAllWindows()
