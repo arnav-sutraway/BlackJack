@@ -1,11 +1,15 @@
 import cv2
+import json
 import numpy as np
+import os
 import threading
 import time
 from ultralytics import YOLO
 
 # --- CONFIGURATION ---
-MODEL_PATH = "runs/detect/train4/weights/best.pt"
+MODEL_PATH = "/Users/tarunsuresh/Downloads/detect/train4/weights/best.pt"
+STATE_FILE = "/tmp/bj_detect_state.json"
+RESET_FILE = "/tmp/bj_detect_reset"
 # Make sure this matches the IP currently shown on your phone's screen
 URL = "http://10.250.53.220:8080/video" 
 
@@ -56,17 +60,33 @@ if not stream.isOpened():
 
 count = 0
 seen_cards = set()  # Confirmed track IDs
-pending = {}       # track_id -> {'rank': str, 'streak': int}
-COMMIT_STREAK = 3  # Frames needed to "confirm" a card
+pending = {}        # track_id -> {'rank': str, 'streak': int}
+last_committed = [] # Ordered list of committed ranks (shared with server.py)
+COMMIT_STREAK = 3   # Frames needed to "confirm" a card
 count_map = {
     '2': 1, '3': 1, '4': 1, '5': 1, '6': 1,
     '7': 0, '8': 0, '9': 0,
     '10': -1, 'J': -1, 'Q': -1, 'K': -1, 'A': -1
 }
 
+def _write_state():
+    with open(STATE_FILE, 'w') as f:
+        json.dump({'last_committed': last_committed, 'count': count}, f)
+
+_write_state()  # Write empty state on startup
 print("Detection started. Press 'q' to quit, 'r' to reset count.")
 
 while True:
+    # Check if server.py requested a reset
+    if os.path.exists(RESET_FILE):
+        os.remove(RESET_FILE)
+        count = 0
+        seen_cards.clear()
+        pending.clear()
+        last_committed.clear()
+        _write_state()
+        print("State reset by server.")
+
     ret, frame = stream.read()
     if not ret or frame is None:
         continue
@@ -103,9 +123,11 @@ while True:
             if streak >= COMMIT_STREAK:
                 # COMMIT the card
                 seen_cards.add(track_id)
+                last_committed.append(rank)
                 if rank in count_map:
                     count += count_map[rank]
                 pending.pop(track_id, None)
+                _write_state()
             else:
                 # Still checking (Yellow)
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
@@ -131,6 +153,8 @@ while True:
         count = 0
         seen_cards.clear()
         pending.clear()
+        last_committed.clear()
+        _write_state()
         print("Count Reset.")
 
 stream.release()

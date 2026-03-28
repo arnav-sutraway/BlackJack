@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
@@ -8,51 +7,18 @@ from advisorbot import BlackjackAgent
 
 agent = BlackjackAgent()
 
-_detector = None
-_detector_init_error = None
+# Shared state files written by camera.py
+STATE_FILE = "/tmp/bj_detect_state.json"
+RESET_FILE = "/tmp/bj_detect_reset"
 
 
-def get_or_create_detector(*, clear_errors=False):
-    """Lazily start CardDetector (YOLO + stream). Fails soft if deps or model missing."""
-    global _detector, _detector_init_error
-    if clear_errors:
-        _detector_init_error = None
-    if _detector is not None:
-        return _detector
-    if _detector_init_error is not None:
-        return None
+def _read_detect_state():
+    """Return the state dict written by camera.py, or None if camera isn't running."""
     try:
-        from camera import CardDetector
-
-        url = os.environ.get("CAMERA_STREAM_URL")
-        _detector = CardDetector(url=url) if url else CardDetector()
-        print("CardDetector started for camera sync.")
-        return _detector
-    except Exception as e:
-        _detector_init_error = str(e)
-        print(f"CardDetector failed to start: {e}")
-        err = str(e).lower()
-        if "cv2" in err or "opencv" in err:
-            print(
-                f"  → Install OpenCV: {sys.executable} -m pip install opencv-python"
-            )
-        if "ultralytics" in err or "torch" in err:
-            print(
-                f"  → Install YOLO stack: {sys.executable} -m pip install ultralytics"
-            )
+        with open(STATE_FILE) as f:
+            return json.load(f)
+    except Exception:
         return None
-
-
-def retry_detector():
-    """Clear cached failure so the next request tries to create the detector again."""
-    global _detector, _detector_init_error
-    if _detector is not None:
-        try:
-            _detector.stop()
-        except Exception:
-            pass
-        _detector = None
-    _detector_init_error = None
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -65,7 +31,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        return
+        return  # silence per-request noise
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -84,25 +50,20 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        if _detector is None:
-            self._send_json(
-                200,
-                {
-                    "available": False,
-                    "error": _detector_init_error
-                    or "Detector not running yet — use Deal in camera mode to start.",
-                    "last_committed": [],
-                },
-            )
-            return
-
-        try:
-            st = _detector.get_state()
-            st["available"] = True
-            st["error"] = None
-            self._send_json(200, st)
-        except Exception as e:
-            self._send_json(500, {"available": False, "error": str(e), "last_committed": []})
+        state = _read_detect_state()
+        if state is None:
+            self._send_json(200, {
+                "available": False,
+                "last_committed": [],
+                "error": "camera.py is not running — start it in a separate terminal.",
+            })
+        else:
+            self._send_json(200, {
+                "available": True,
+                "last_committed": state.get("last_committed", []),
+                "count": state.get("count", 0),
+                "error": None,
+            })
 
     def do_POST(self):
         path = urlparse(self.path).path
@@ -110,33 +71,15 @@ class RequestHandler(BaseHTTPRequestHandler):
         post_data = self.rfile.read(length) if length else b""
 
         if path == "/detect/reset":
-            det = get_or_create_detector(clear_errors=True)
-            if det is None:
-                self._send_json(
-                    503,
-                    {
-                        "ok": False,
-                        "error": _detector_init_error or "Could not start CardDetector",
-                    },
-                )
-                return
+            # Signal camera.py to reset, and immediately clear the state file
             try:
-                det.reset()
+                with open(RESET_FILE, "w") as f:
+                    f.write("reset")
+                with open(STATE_FILE, "w") as f:
+                    json.dump({"last_committed": [], "count": 0}, f)
                 self._send_json(200, {"ok": True})
             except Exception as e:
                 self._send_json(500, {"ok": False, "error": str(e)})
-            return
-
-        if path == "/detect/retry":
-            retry_detector()
-            det = get_or_create_detector()
-            self._send_json(
-                200,
-                {
-                    "ok": det is not None,
-                    "error": None if det is not None else _detector_init_error,
-                },
-            )
             return
 
         if path == "/advise":
@@ -159,7 +102,8 @@ class RequestHandler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     port = 8000
     httpd = HTTPServer(("", port), RequestHandler)
-    print(f"Server on port {port} — /advise, GET /detect/state, POST /detect/reset")
+    print(f"Server running on http://127.0.0.1:{port}")
+    print("Endpoints: GET /detect/state  POST /detect/reset  POST /advise")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
