@@ -4,10 +4,34 @@ import threading
 import time
 from ultralytics import YOLO
 
-MODEL_PATH = "runs/detect/train4/weights/best.pt"
 
-# Default: IP Webcam (or similar) on your phone — same Wi‑Fi as the PC. Change in app or set CAMERA_URL.
-DEFAULT_STREAM_URL = "http://10.250.53.220:8080/video"
+DEFAULT_STREAM_URL = "http://10.250.34.10:4747/video"
+
+def start_camera():
+    cap = cv2.VideoCapture(DEFAULT_STREAM_URL)
+
+    if not cap.isOpened():
+        return
+
+    while True:
+        ret, frame = cap.read()
+        
+        if not ret:
+            break
+
+        cv2.imshow('Antigravity - Python 3.14 Feed', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    start_camera()
+
+if __name__ == "__main__":
+    start_camera()
 
 
 def _open_capture(source):
