@@ -4,14 +4,16 @@ import numpy as np
 import os
 import threading
 import time
+from dotenv import load_dotenv
 from ultralytics import YOLO
 
-# --- CONFIGURATION ---
-MODEL_PATH = "runs/detect/train4/weights/best.pt"
+load_dotenv()
+
+# --- CONFIGURATION (override any of these in your .env file) ---
+MODEL_PATH = os.environ.get("MODEL_PATH", "best.pt")
+URL = os.environ.get("CAMERA_URL", "http://192.168.1.100:8080/video")
 STATE_FILE = "/tmp/bj_detect_state.json"
 RESET_FILE = "/tmp/bj_detect_reset"
-# Make sure this matches the IP currently shown on your phone's screen
-URL = "http://10.250.53.220:8080/video" 
 
 # --- THREADED READER ---
 class StreamReader:
