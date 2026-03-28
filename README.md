@@ -24,7 +24,7 @@ This project demonstrates how modern AI systems bridge the gap between computer 
 ### Custom-Trained AI Model
 * Trained on a **~2GB dataset** of labeled playing cards.
 * Over **3 million parameters**.
-* **CPU Optimized:** Fully trained on a CPU over ~12 hours (achieving `cls_loss ≈ 0.79`).
+* **CPU Optimized:** Fully trained on a GPU using Georgia Tech's ICE cluster (achieving `cls_loss ≈ 0.79`).
 
 ### Intelligent Object Tracking
 * Assigns persistent IDs to cards to **prevent double-counting**.
