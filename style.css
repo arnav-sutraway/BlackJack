@@ -1,0 +1,361 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100vh;
+    background-color: #121212;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Inter', sans-serif;
+    color: white;
+    overflow: hidden;
+}
+
+.game-container {
+    position: relative;
+    /* Aspect ratio matched to original user image for scale preservation */
+    aspect-ratio: 1024 / 591;
+    max-width: 100%;
+    max-height: 100vh;
+    
+    background-color: #1a1b1c; /* Removed background image */
+    
+    /* Ensure scaling happens purely by height or width while preserving ratio */
+    height: 100%;
+}
+
+/* Fallback behavior if viewport is wider than image aspect ratio */
+@media (max-aspect-ratio: 1024/591) {
+    .game-container {
+        width: 100vw;
+        height: auto;
+    }
+}
+
+/* -----------------------------
+   DYNAMIC CSS CASINO TABLE 
+   ----------------------------- */
+.casino-table {
+    position: absolute;
+    top: 45%;
+    left: 40%; /* Moved table significantly to the left to free up the right side */
+    transform: translate(-50%, -50%);
+    width: 70%;
+    height: 75%;
+    background: #111; /* Outer rail color (leather/wood) */
+    border-radius: 50%; /* Pure ellipse / oval */
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 5px 15px rgba(255,255,255,0.05);
+    padding: 1.5vw; /* Rail thickness */
+    box-sizing: border-box;
+}
+
+.table-felt {
+    width: 100%;
+    height: 100%;
+    /* Bright dynamic casino green felt */
+    background: radial-gradient(ellipse at center, #2e8b57 0%, #1e5c3a 100%);
+    border-radius: 50%;
+    box-shadow: inset 0 10px 40px rgba(0,0,0,0.6);
+    position: relative;
+    border: 2px solid rgba(0,0,0,0.4);
+}
+
+.table-markings {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    pointer-events: none; /* Let clicking happen correctly through */
+    width: 80%;
+}
+
+.table-markings h1 { 
+    font-size: 2.2vw; 
+    letter-spacing: 2px; 
+    margin: 0; 
+    font-weight: 800;
+}
+.table-markings h2 { 
+    font-size: 1vw; 
+    letter-spacing: 1px; 
+    margin: 10px 0 0 0; 
+    text-transform: uppercase; 
+    font-weight: 600;
+}
+
+/* Primary Action Buttons */
+.control-panel {
+    position: absolute;
+    bottom: 2%;
+    left: 40%; /* Align evenly with the table */
+    transform: translateX(-50%);
+    width: auto; /* Fit precisely to the buttons */
+    height: auto;
+    background: rgba(20, 20, 25, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    padding: 1% 2%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-sizing: border-box;
+    gap: 1.5vw;
+    flex-wrap: nowrap;
+}
+
+/* Primary Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 1vw;
+    justify-content: center;
+}
+
+.action-btn {
+    padding: 1.2vw 2vw;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    font-size: 1.2vw;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
+
+.action-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    filter: brightness(1.15);
+    border: 2px solid #10b981; /* Green highlight around the sides */
+    box-shadow: 0 0 15px 5px rgba(16, 185, 129, 0.6), 0 4px 12px rgba(0,0,0,0.4); /* Green glow effect */
+}
+
+.action-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.action-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
+/* Button Colors */
+.green { background: linear-gradient(135deg, #10b981, #059669); }
+.red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.orange { background: linear-gradient(135deg, #f97316, #ea580c); }
+.purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+/* Play Area & Coordinates */
+.play-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Let clicks pass through except on cards */
+    z-index: 5;
+}
+
+/* Card Zones */
+.card-zone {
+    position: absolute;
+    width: 20%; 
+    height: 20%; 
+    display: flex;
+    justify-content: center;
+    padding: 1vw;
+    box-sizing: border-box;
+}
+
+/* Dealer Hand Position: Aligned to top inner curve of CSS table */
+.dealer-zone {
+    top: 15%;
+    left: 40%;
+    transform: translateX(-50%);
+}
+
+/* Player Hand Position */
+.player-zone {
+    bottom: 25%;
+    left: 40%;
+    transform: translateX(-50%);
+}
+
+/* -----------------------------
+   AI ADVISOR CHAT UI (Right Side)
+   ----------------------------- */
+.ai-advisor-panel {
+    position: absolute;
+    bottom: 2%;
+    right: 2%;
+    width: 26%;
+    height: 55%;
+    background: rgba(20, 20, 25, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(45, 137, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    overflow: hidden;
+}
+
+.chat-header {
+    background: rgba(30, 30, 40, 0.85);
+    padding: 1vw 1.5vw;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-header h2 {
+    margin: 0;
+    font-size: 1.1vw;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: -webkit-linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pulse-indicator {
+    width: 10px;
+    height: 10px;
+    background-color: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #10b981;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.chat-content {
+    flex: 1;
+    padding: 1.5vw;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5vw;
+}
+
+/* Scrollbar tweaks */
+.chat-content::-webkit-scrollbar { width: 6px; }
+.chat-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+.chat-message {
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.msg-bubble {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1.2vw 1.5vw;
+    border-radius: 12px;
+    border-left: 3px solid #4facfe;
+    color: #e2e8f0;
+    font-size: 0.95vw;
+    line-height: 1.6;
+    word-break: break-word;
+}
+
+.msg-bubble h3 {
+    margin: 0 0 10px 0;
+    font-size: 1vw;
+    color: #4facfe;
+}
+
+.msg-bubble strong { color: #fff; }
+
+.loading-msg .msg-bubble {
+    background: rgba(30, 30, 40, 0.5);
+    border-left-color: #f59e0b;
+    color: #a0aec0;
+    font-style: italic;
+}
+
+/* Dynamic CSS Cards */
+.card {
+    width: 6vw; /* ~60px */
+    height: 8.5vw; /* ~85px */
+    background: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.5vw;
+    font-size: 1.5vw;
+    font-weight: bold;
+    box-sizing: border-box;
+    position: relative;
+    color: #111;
+    pointer-events: auto; /* Let cards be interactive later if needed */
+    user-select: none;
+    
+    /* Animation defaults */
+    opacity: 0;
+    transform: translateY(-50px) rotateY(180deg) scale(0.8);
+    animation: slideAndFlip 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.card.red-suit {
+    color: #e11d48;
+}
+
+.card .top-left { text-align: left; line-height: 1; }
+.card .bottom-right { text-align: right; transform: rotate(180deg); line-height: 1; }
+.card .center-suit { 
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%);
+    font-size: 3vw; 
+}
+
+/* For overlapping effect */
+.card:not(:first-child) {
+    margin-left: -3vw;
+}
+
+/* Card deal animation */
+@keyframes slideAndFlip {
+    0% {
+        opacity: 0;
+        transform: translateY(-100px) translateX(200px) rotateY(180deg) scale(0.5);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-20px) translateX(0) rotateY(90deg) scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) translateX(0) rotateY(0deg) scale(1);
+    }
+}
