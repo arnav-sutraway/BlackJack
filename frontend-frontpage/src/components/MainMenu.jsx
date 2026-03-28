@@ -9,7 +9,7 @@ const MainMenu = ({ onOpenRules, onOpenDevice, onOpenAbout }) => {
         subtext="Play Now"
         variant="black" 
         iconName="spade" 
-        onClick={() => console.log('Play clicked')}
+        onClick={() => window.location.href = '/game.html'}
       />
       <MenuButton 
         label="Rules" 

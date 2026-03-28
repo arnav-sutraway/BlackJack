@@ -56,4 +56,6 @@ labels/
 # =========================
 *.mp4
 *.avi
-*.mov
+*.mov.env
+.env
+.env
