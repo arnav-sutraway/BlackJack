@@ -44,3 +44,6 @@ cards in real time and recommend the optimal move.
 
 ## Contributors
 - [@arnav-sutraway](https://github.com/arnav-sutraway)
+- [@TarunIsCOde](https://github.com/TarunIsCOde)
+- [@rajprian123-bit](https://github.com/rajprian123-bit)
+- [@Shayan-kam](https://github.com/Shayan-kam)
