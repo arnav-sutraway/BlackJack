@@ -1,11 +1,22 @@
 import os
-import google.generativeai as genai
-from dotenv import load_dotenv
+import sys
 
+from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configure the legacy SDK natively
+import google.generativeai as genai
+
+# Anaconda / old envs often have google-generativeai==0.1.0rc1, which has no GenerativeModel.
+# Current releases require Python 3.9+; pip will not upgrade the package on Python 3.8.
+if not hasattr(genai, "GenerativeModel"):
+    raise ImportError(
+        "google-generativeai is too old or broken (no GenerativeModel). "
+        "Use Python 3.9+ and reinstall: pip install -U 'google-generativeai>=0.8' "
+        f"(see requirements.txt). Current interpreter: {sys.executable} "
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 class BlackjackAgent:
@@ -39,15 +50,26 @@ class BlackjackAgent:
         stats_header = f"### Live Math\n**Player Bust Risk:** {my_risk}% | **Dealer Bust Risk:** {d_risk}%\n\n---\n\n### Agent Reasoning\n"
 
         try:
-            # Utilizing the widespread compatible SDK version
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Use a current stable model; gemini-1.5-flash is deprecated / often 404 for new keys.
+            model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(prompt)
-            
-            # Combine the hard math with the AI reasoning
-            return stats_header + response.text
+
+            # .text raises ValueError when the reply was blocked or has no text parts.
+            try:
+                text = response.text
+            except ValueError:
+                text = ''
+            if not text and response.candidates:
+                c0 = response.candidates[0]
+                parts = (c0.content.parts if c0.content else None) or []
+                text = ''.join(p.text for p in parts if getattr(p, 'text', None))
+            if not text:
+                raise ValueError('Empty or blocked model response (no text parts)')
+
+            return stats_header + text
         except Exception as e:
             # Emergency Fallback if the API fails during the demo
-            print(f"API Error: {e}")
+            print(f"API Error: {type(e).__name__}: {e}")
             if total >= 17: 
                 return stats_header + "THOUGHT: High total reached. | ACTION: STAND"
             return stats_header + "THOUGHT: Low total, safe to proceed. | ACTION: HIT"
