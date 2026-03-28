@@ -7,7 +7,7 @@ import time
 from ultralytics import YOLO
 
 # --- CONFIGURATION ---
-MODEL_PATH = "/Users/tarunsuresh/Downloads/detect/train4/weights/best.pt"
+MODEL_PATH = "runs/detect/train4/weights/best.pt"
 STATE_FILE = "/tmp/bj_detect_state.json"
 RESET_FILE = "/tmp/bj_detect_reset"
 # Make sure this matches the IP currently shown on your phone's screen
