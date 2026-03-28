@@ -1,4 +1,4 @@
-# BlackJack AI Assistant 🃏
+# HackJack - BlackJack AI Assistant 🃏
 
 A Blackjack game that uses computer vision and the Gemini API to recognize 
 cards in real time and recommend the optimal move.
