@@ -1,12 +1,12 @@
 import os
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 
 load_dotenv()
 
-
-client = genai.Client()
+# Configure the legacy SDK natively
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 class BlackjackAgent:
     def __init__(self):
@@ -36,14 +36,13 @@ class BlackjackAgent:
         """
 
         # THE FIX: Hardcode the stats to always appear at the top of the UI
-        stats_header = f"### 📊 Live Math\n**Player Bust Risk:** {my_risk}% | **Dealer Bust Risk:** {d_risk}%\n\n---\n\n### 🤖 Agent Reasoning\n"
+        stats_header = f"### Live Math\n**Player Bust Risk:** {my_risk}% | **Dealer Bust Risk:** {d_risk}%\n\n---\n\n### Agent Reasoning\n"
 
         try:
-            # The NEW way to call Gemini 1.5 Flash
-            response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
+            # Utilizing the widespread compatible SDK version
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            
             # Combine the hard math with the AI reasoning
             return stats_header + response.text
         except Exception as e:

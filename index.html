@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackjack Web Interface</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- The Dynamic CSS Table -->
+        <div class="casino-table">
+            <div class="table-felt">
+                <div class="table-markings">
+                    <h1>BLACKJACK</h1>
+                    <h2>LEARN TO PLAY BLACKJACK!</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Panel -> Now Bottom Panel -->
+        <aside class="control-panel glassmorphic">
+            <!-- Primary Action Buttons -->
+            <div class="action-buttons">
+                <button class="action-btn purple" id="btn-deal">DEAL</button>
+                <button class="action-btn green" id="btn-hit" disabled>HIT</button>
+                <button class="action-btn red" id="btn-stand" disabled>STAND</button>
+                <button class="action-btn blue" id="btn-split" disabled>SPLIT</button>
+                <button class="action-btn orange" id="btn-double" disabled>DOUBLE DOWN</button>
+            </div>
+        </aside>
+
+        <!-- The Dynamic AI Chat UI (Right Side) -->
+        <aside class="ai-advisor-panel glassmorphic">
+            <div class="chat-header">
+                <h2>🤖 Blackjack Advisor</h2>
+                <div class="pulse-indicator"></div>
+            </div>
+            <div class="chat-content" id="chat-content-box">
+                <div class="chat-message system-msg">
+                    <div class="msg-bubble">Waiting for you to hit DEAL...</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Dynamic Gameplay Canvas Area -->
+        <div class="play-area">
+            <!-- Dealer Zone -->
+            <div class="card-zone dealer-zone" id="dealer-hand"></div>
+            
+            <!-- Player Zone -->
+            <div class="card-zone player-zone" id="player-hand"></div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
