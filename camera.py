@@ -1,21 +1,14 @@
 import cv2
-import json
 import numpy as np
-import os
 import threading
 import time
-from dotenv import load_dotenv
 from ultralytics import YOLO
 
-load_dotenv()
+model = YOLO("runs/detect/train4/weights/best.pt")
 
-# --- CONFIGURATION (override any of these in your .env file) ---
-MODEL_PATH = os.environ.get("MODEL_PATH", "best.pt")
-URL = os.environ.get("CAMERA_URL", "http://192.168.1.100:8080/video")
-STATE_FILE = "/tmp/bj_detect_state.json"
-RESET_FILE = "/tmp/bj_detect_reset"
+url = "http://10.250.53.220:8080/video"
 
-# --- THREADED READER ---
+
 class StreamReader:
     def __init__(self, url):
         self.url = url
@@ -37,7 +30,7 @@ class StreamReader:
                     self.ret = ret
                     self.frame = frame
             else:
-                time.sleep(0.01)
+                time.sleep(0.05)
 
     def read(self):
         with self.lock:
@@ -50,114 +43,121 @@ class StreamReader:
 
     def release(self):
         self.running = False
+        self.thread.join(timeout=2)
         self.cap.release()
 
-# --- INITIALIZATION ---
-model = YOLO(MODEL_PATH)
-stream = StreamReader(URL)
+
+stream = StreamReader(url)
 
 if not stream.isOpened():
-    print("CRITICAL: Cannot connect to phone. Check IP and Wi-Fi.")
+    print("Failed to connect to stream. Check IP and that IP Webcam is running.")
     exit()
 
-count = 0
-seen_cards = set()  # Confirmed track IDs
-pending = {}        # track_id -> {'rank': str, 'streak': int}
-last_committed = [] # Ordered list of committed ranks (shared with server.py)
-COMMIT_STREAK = 3   # Frames needed to "confirm" a card
+print("Stream connected. Starting detection...")
+print("Model class names:", model.names)
+
 count_map = {
     '2': 1, '3': 1, '4': 1, '5': 1, '6': 1,
     '7': 0, '8': 0, '9': 0,
     '10': -1, 'J': -1, 'Q': -1, 'K': -1, 'A': -1
 }
 
-def _write_state():
-    with open(STATE_FILE, 'w') as f:
-        json.dump({'last_committed': last_committed, 'count': count}, f)
+count = 0
+seen_cards = set()   # Committed track_ids
+pending = {}         # track_id -> { 'rank': str, 'streak': int }
+COMMIT_STREAK = 4
+failed_frames = 0
+MAX_FAILED_FRAMES = 100
 
-_write_state()  # Write empty state on startup
-print("Detection started. Press 'q' to quit, 'r' to reset count.")
 
 while True:
-    # Check if server.py requested a reset
-    if os.path.exists(RESET_FILE):
-        os.remove(RESET_FILE)
-        count = 0
-        seen_cards.clear()
-        pending.clear()
-        last_committed.clear()
-        _write_state()
-        print("State reset by server.")
-
     ret, frame = stream.read()
+
     if not ret or frame is None:
+        failed_frames += 1
+        if failed_frames % 20 == 0:
+            print(f"Waiting for stream... ({failed_frames}/{MAX_FAILED_FRAMES})")
+        if failed_frames >= MAX_FAILED_FRAMES:
+            print("Stream lost. Attempting reconnect...")
+            stream.release()
+            stream = StreamReader(url)
+            failed_frames = 0
+            if not stream.isOpened():
+                print("Reconnect failed. Exiting.")
+                break
         continue
 
-    # 1. RUN TRACKING (persist=True is required for box.id)
+    failed_frames = 0
+
     results = model.track(frame, conf=0.35, persist=True, verbose=False)
+
     active_ids = set()
 
-    if results and results[0].boxes.id is not None:
-        boxes = results[0].boxes
-        for box in boxes:
-            track_id = int(box.id[0])
-            cls_id = int(box.cls[0])
-            rank = model.names[cls_id]
-            active_ids.add(track_id)
-            
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+    for r in results:
+        boxes = r.boxes
+        if boxes is None:
+            continue
 
-            # Logic: If already counted, draw ORANGE
-            if track_id in seen_cards:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
-                cv2.putText(frame, f"{rank} (OK)", (x1, y1-10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 165, 0), 2)
+        for box in boxes:
+            cls_id     = int(box.cls[0])
+            rank       = model.names[cls_id]
+            confidence = float(box.conf[0])
+            track_id   = int(box.id[0]) if box.id is not None else None
+
+            if track_id is None or confidence < 0.35:
                 continue
 
-            # Logic: New card detected, check streak
+            active_ids.add(track_id)
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            # Already committed — draw orange
+            if track_id in seen_cards:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
+                cv2.putText(frame, f"{rank} (counted)", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                continue
+
+            # Update streak — reset if rank changed for this track_id
             if track_id not in pending or pending[track_id]['rank'] != rank:
                 pending[track_id] = {'rank': rank, 'streak': 1}
             else:
                 pending[track_id]['streak'] += 1
 
             streak = pending[track_id]['streak']
-            
+
+            # Yellow while building streak
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
+            cv2.putText(frame, f"{rank} ({streak}/{COMMIT_STREAK})", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+            # Commit after enough consistent frames
             if streak >= COMMIT_STREAK:
-                # COMMIT the card
                 seen_cards.add(track_id)
-                last_committed.append(rank)
                 if rank in count_map:
                     count += count_map[rank]
-                pending.pop(track_id, None)
-                _write_state()
-            else:
-                # Still checking (Yellow)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
-                cv2.putText(frame, f"Checking {rank}... {streak}/{COMMIT_STREAK}", 
-                            (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                    print(f"Committed: {rank} (ID:{track_id}) | Running count: {count}")
+                else:
+                    print(f"Unrecognized rank: '{rank}'")
+                del pending[track_id]
 
-    # 2. CLEANUP: Remove IDs that are no longer in the camera frame
-    pending = {tid: val for tid, val in pending.items() if tid in active_ids}
+    # Clean up pending for IDs no longer visible
+    for tid in list(pending.keys()):
+        if tid not in active_ids:
+            del pending[tid]
 
-    # 3. OVERLAYS
-    cv2.putText(frame, f"Count: {count}", (20, 50), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
-    cv2.putText(frame, f"Cards: {len(seen_cards)}", (20, 90), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+    cv2.putText(frame, f"Count: {count}",                   (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+    cv2.putText(frame, f"Cards seen: {len(seen_cards)}/52", (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
 
     cv2.imshow("Blackjack Counter", frame)
 
-    # 4. KEYBOARD CONTROLS
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
     elif key == ord('r'):
-        count = 0
         seen_cards.clear()
         pending.clear()
-        last_committed.clear()
-        _write_state()
-        print("Count Reset.")
+        count = 0
+        print("Reset — new shoe started")
 
 stream.release()
 cv2.destroyAllWindows()
